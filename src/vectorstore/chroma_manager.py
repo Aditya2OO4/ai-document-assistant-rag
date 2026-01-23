@@ -7,10 +7,15 @@ class ChromaVectorStore:
         self.persist_directory = persist_directory
         self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         
-        # This class name is correct for langchain-huggingface==0.0.3
+        if not self.api_key:
+            print("CRITICAL: HUGGINGFACEHUB_API_TOKEN is missing!")
+
+        # Initialize Embedding Model
+        # using 'huggingfacehub_api_token' parameter explicitly for older versions
         self.embedding_model = HuggingFaceEndpointEmbeddings(
             huggingfacehub_api_token=self.api_key,
-            model="sentence-transformers/all-MiniLM-L6-v2"
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            task="feature-extraction"  # Explicitly stating task helps stability
         )
         self.vector_store = None
 
@@ -23,16 +28,15 @@ class ChromaVectorStore:
         return self.vector_store
 
     def create_store(self, documents):
-        """Creates a new vector store and persists it."""
+        """Creates a new vector store from documents."""
+        # Using from_documents is the standard correct method
         self.vector_store = Chroma.from_documents(
             documents=documents,
             embedding=self.embedding_model,
             persist_directory=self.persist_directory
         )
-        self.vector_store.persist()
         return self.vector_store
 
     def add_documents(self, documents):
         vector_store = self.get_vector_store()
         vector_store.add_documents(documents)
-        vector_store.persist()
