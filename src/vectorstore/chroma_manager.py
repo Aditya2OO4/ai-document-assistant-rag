@@ -2,17 +2,16 @@ import os
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_community.vectorstores import Chroma
 
-class ChromaVectorStore:  # Renamed to match your app_flask.py import
+class ChromaVectorStore:
     def __init__(self, persist_directory="db"):
         self.persist_directory = persist_directory
-        
-        # Get the API Key from Render Environment Variables
+        # Get API Key from Render Environment Variables
         self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         
         if not self.api_key:
-            # This will show up in your Render logs if you forgot the Env Var
-            print("ERROR: HUGGINGFACEHUB_API_TOKEN not found!")
-            
+            print("CRITICAL ERROR: HUGGINGFACEHUB_API_TOKEN not set!")
+
+        # Using the API endpoint saves 500MB+ of RAM on Render
         self.embedding_model = HuggingFaceEndpointEmbeddings(
             huggingfacehub_api_token=self.api_key,
             model="sentence-transformers/all-MiniLM-L6-v2"
@@ -30,5 +29,5 @@ class ChromaVectorStore:  # Renamed to match your app_flask.py import
     def add_documents(self, documents):
         vector_store = self.get_vector_store()
         vector_store.add_documents(documents)
-        # Note: In newer Chroma versions, persist() is often handled automatically,
-        # but keeping it doesn't hurt.
+        # Chroma 0.4+ persists automatically, but call is kept for compatibility
+        vector_store.persist()
