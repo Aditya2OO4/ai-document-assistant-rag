@@ -1,18 +1,13 @@
-# Modern LangChain Core
 langchain-core==0.2.38
 langchain==0.2.16
 langchain-community==0.2.16
 langchain-text-splitters==0.2.4
-
-# Fixes the 'InferenceClient' error
-langchain-huggingface==0.1.0
-huggingface-hub==0.26.2
-
-# LLM & RAG Support
+langchain-huggingface==0.0.3
 langchain-mistralai==0.1.10
 mistralai==0.4.2
 chromadb==0.5.3
 flask==3.0.2
 gunicorn==21.2.0
 python-dotenv==1.0.1
+sentence-transformers==3.0.1
 pypdf==4.2.0
