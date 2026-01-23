@@ -1,54 +1,32 @@
-import os
-import google.generativeai as genai
 from typing import List
-from langchain_core.documents import Document
+from langchain.schema import Document
+from langchain.prompts import PromptTemplate
+from langchain_mistralai.chat_models import ChatMistralAI
 
 
 class RAGChain:
     """
-    Combines retrieved documents with Gemini LLM
-    to generate grounded answers.
+    Performs Retrieval Augmented Generation using Mistral.
     """
 
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY not set")
-
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
-
-    def _build_context(self, documents: List[Document]) -> str:
-        """
-        Combines retrieved document chunks into a single context string.
-        """
-        context = "\n\n".join(
-            f"Source {i+1}:\n{doc.page_content}"
-            for i, doc in enumerate(documents)
+    def __init__(self):
+        # Initialize Mistral chat model
+        self.llm = ChatMistralAI(
+            model="mistral-small-latest",
+            temperature=0.2
         )
-        return context
 
-    def generate_answer(self, query: str, documents: List[Document]) -> str:
-        """
-        Generates an answer using retrieved context + user query.
-        """
-        context = self._build_context(documents)
+        # Simple template
+        self.template = 
+        self.prompt = PromptTemplate(
+            input_variables=["context", "question"],
+            template=self.template
+        )
 
-        prompt = f"""
-You are an AI assistant. Answer the question strictly
-using the context provided below.
+    def generate_answer(self, question: str, docs: List[Document]) -> str:
+        context_text = "\n\n".join([d.page_content for d in docs])
+        prompt_text = self.prompt.format(context=context_text, question=question)
 
-If the answer is not present in the context, say:
-"I don't know based on the provided document."
-
-Context:
-{context}
-
-Question:
-{query}
-
-Answer:
-"""
-
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
+        # Ask Mistral
+        answer = self.llm.chat([{"role": "user", "content": prompt_text}])
+        return answer.content
