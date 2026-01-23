@@ -10,12 +10,15 @@ class ChromaVectorStore:
         if not self.api_key:
             print("CRITICAL: HUGGINGFACEHUB_API_TOKEN is missing!")
 
-        # Initialize Embedding Model
-        # using 'huggingfacehub_api_token' parameter explicitly for older versions
+        # --- THE FIX IS HERE ---
+        # We manually define the new 'router' URL to bypass the 410 Error
+        model_id = "sentence-transformers/all-MiniLM-L6-v2"
+        api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
+
         self.embedding_model = HuggingFaceEndpointEmbeddings(
             huggingfacehub_api_token=self.api_key,
-            model="sentence-transformers/all-MiniLM-L6-v2",
-            task="feature-extraction"  # Explicitly stating task helps stability
+            endpoint_url=api_url,  # <--- FORCE THE NEW URL
+            task="feature-extraction"
         )
         self.vector_store = None
 
@@ -29,7 +32,6 @@ class ChromaVectorStore:
 
     def create_store(self, documents):
         """Creates a new vector store from documents."""
-        # Using from_documents is the standard correct method
         self.vector_store = Chroma.from_documents(
             documents=documents,
             embedding=self.embedding_model,
