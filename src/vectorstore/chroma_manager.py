@@ -1,9 +1,8 @@
 import os
 import logging
-from langchain.schema import Document
 from langchain_community.vectorstores import Chroma
 
-# Configure logging to see exactly what happens on Render
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -15,26 +14,27 @@ class ChromaVectorStore:
         
         # 1. Try Hugging Face API (Best for Render 512MB RAM)
         api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        
         if api_key:
             try:
                 from langchain_huggingface import HuggingFaceEndpointEmbeddings
                 logger.info("Attempting to use HuggingFace Inference API...")
+                # We do NOT use 'endpoint_url' here to avoid Pydantic errors.
+                # We rely on the library (updated in requirements.txt) to use the correct new URL.
                 self.embedding_model = HuggingFaceEndpointEmbeddings(
                     huggingfacehub_api_token=api_key,
                     model="sentence-transformers/all-MiniLM-L6-v2",
-                    task="feature-extraction"
-                    # endpoint_url removed to fix Pydantic error
+                    task="feature-extraction" 
                 )
                 logger.info("Successfully initialized HuggingFace API Embeddings.")
             except Exception as e:
                 logger.error(f"Failed to load HF API Embeddings: {e}")
                 self.embedding_model = None
 
-        # 2. Fallback: Local SentenceTransformers (Uses CPU/RAM)
+        # 2. Fallback: Local SentenceTransformers (Safety Net)
         if self.embedding_model is None:
-            logger.warning("Falling back to local SentenceTransformers. WARNING: High RAM usage.")
+            logger.warning("Falling back to local SentenceTransformers. RAM usage will increase.")
             try:
-                # We use the standard HuggingFaceEmbeddings which runs locally
                 from langchain_huggingface import HuggingFaceEmbeddings
                 self.embedding_model = HuggingFaceEmbeddings(
                     model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -54,14 +54,10 @@ class ChromaVectorStore:
 
     def create_store(self, documents):
         """Creates a new vector store from documents."""
-        logger.info(f"Creating vector store with {len(documents)} documents...")
+        logger.info(f"Creating vector store with {len(documents)} document chunks...")
         self.vector_store = Chroma.from_documents(
             documents=documents,
             embedding=self.embedding_model,
             persist_directory=self.persist_directory
         )
         return self.vector_store
-
-    def add_documents(self, documents):
-        vector_store = self.get_vector_store()
-        vector_store.add_documents(documents)
