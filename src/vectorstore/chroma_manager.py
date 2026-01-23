@@ -1,26 +1,48 @@
 import os
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
+import logging
+from langchain.schema import Document
 from langchain_community.vectorstores import Chroma
+
+# Configure logging to see exactly what happens on Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ChromaVectorStore:
     def __init__(self, persist_directory="db"):
         self.persist_directory = persist_directory
-        self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
-        
-        if not self.api_key:
-            print("CRITICAL: HUGGINGFACEHUB_API_TOKEN is missing!")
-
-        # --- THE FIX IS HERE ---
-        # We manually define the new 'router' URL to bypass the 410 Error
-        model_id = "sentence-transformers/all-MiniLM-L6-v2"
-        api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}"
-
-        self.embedding_model = HuggingFaceEndpointEmbeddings(
-            huggingfacehub_api_token=self.api_key,
-            endpoint_url=api_url,  # <--- FORCE THE NEW URL
-            task="feature-extraction"
-        )
         self.vector_store = None
+        self.embedding_model = None
+        
+        # 1. Try Hugging Face API (Best for Render 512MB RAM)
+        api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        if api_key:
+            try:
+                from langchain_huggingface import HuggingFaceEndpointEmbeddings
+                logger.info("Attempting to use HuggingFace Inference API...")
+                self.embedding_model = HuggingFaceEndpointEmbeddings(
+                    huggingfacehub_api_token=api_key,
+                    model="sentence-transformers/all-MiniLM-L6-v2",
+                    task="feature-extraction"
+                    # endpoint_url removed to fix Pydantic error
+                )
+                logger.info("Successfully initialized HuggingFace API Embeddings.")
+            except Exception as e:
+                logger.error(f"Failed to load HF API Embeddings: {e}")
+                self.embedding_model = None
+
+        # 2. Fallback: Local SentenceTransformers (Uses CPU/RAM)
+        if self.embedding_model is None:
+            logger.warning("Falling back to local SentenceTransformers. WARNING: High RAM usage.")
+            try:
+                # We use the standard HuggingFaceEmbeddings which runs locally
+                from langchain_huggingface import HuggingFaceEmbeddings
+                self.embedding_model = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/all-MiniLM-L6-v2"
+                )
+                logger.info("Successfully initialized Local Embeddings.")
+            except Exception as e:
+                logger.critical(f"CRITICAL: Could not load ANY embedding model: {e}")
+                raise e
 
     def get_vector_store(self):
         if self.vector_store is None:
@@ -32,6 +54,7 @@ class ChromaVectorStore:
 
     def create_store(self, documents):
         """Creates a new vector store from documents."""
+        logger.info(f"Creating vector store with {len(documents)} documents...")
         self.vector_store = Chroma.from_documents(
             documents=documents,
             embedding=self.embedding_model,
