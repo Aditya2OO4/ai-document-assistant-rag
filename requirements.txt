@@ -4,7 +4,7 @@ gunicorn==21.2.0
 chromadb==0.5.5
 
 langchain==0.2.15
-langchain-core==0.2.36
+langchain-core==0.2.38
 langchain-community==0.2.14
 langchain-text-splitters==0.2.4
 
@@ -13,4 +13,5 @@ mistralai==0.2.0
 pypdf==4.3.1
 pdfminer.six==20231228
 sentence-transformers==2.7.0
+
 
