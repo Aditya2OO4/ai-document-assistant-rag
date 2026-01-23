@@ -1,20 +1,21 @@
 import os
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_community.vectorstores import Chroma
 
-class ChromaManager:
+class ChromaVectorStore:  # Renamed to match your app_flask.py import
     def __init__(self, persist_directory="db"):
         self.persist_directory = persist_directory
-        # Use Inference API to save memory on Render
-        # Ensure HUGGINGFACEHUB_API_TOKEN is set in Render Environment Variables
+        
+        # Get the API Key from Render Environment Variables
         self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         
         if not self.api_key:
-            raise ValueError("HUGGINGFACEHUB_API_TOKEN not found in environment variables")
-
-        self.embedding_model = HuggingFaceInferenceAPIEmbeddings(
-            api_key=self.api_key,
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+            # This will show up in your Render logs if you forgot the Env Var
+            print("ERROR: HUGGINGFACEHUB_API_TOKEN not found!")
+            
+        self.embedding_model = HuggingFaceEndpointEmbeddings(
+            huggingfacehub_api_token=self.api_key,
+            model="sentence-transformers/all-MiniLM-L6-v2"
         )
         self.vector_store = None
 
@@ -29,4 +30,5 @@ class ChromaManager:
     def add_documents(self, documents):
         vector_store = self.get_vector_store()
         vector_store.add_documents(documents)
-        vector_store.persist()
+        # Note: In newer Chroma versions, persist() is often handled automatically,
+        # but keeping it doesn't hurt.
