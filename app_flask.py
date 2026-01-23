@@ -1,53 +1,71 @@
-from flask import Flask, render_template, request
 import os
-os.environ["ANONYMIZED_TELEMETRY"] = "False"
+import tempfile
+from flask import Flask, render_template, request
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from src.vectorstore.chroma_manager import ChromaVectorStore
+from src.rag.rag_chain import RAGChain
+
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "data"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-@app.route("/health")
-def health():
-    return "OK", 200
-
+# Disable ChromaDB telemetry to stop those "capture" errors in logs
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     answer = None
+    error = None
+    
+    if request.method == "POST":
+        # 1. Handle File Upload
+        if 'file' not in request.files:
+            return render_template("index.html", error="No file part")
+        
+        file = request.files['file']
+        if file.filename == '':
+            return render_template("index.html", error="No selected file")
 
-    if request.method == "POST" and "pdf" in request.files:
-        from src.ingestion.document_loader import PDFDocumentLoader
-        from src.ingestion.text_splitter import TextSplitter
-        from src.vectorstore.chroma_manager import ChromaVectorStore
-        from src.retrieval.retriever import VectorRetriever
-        from src.rag.rag_chain import RAGChain
+        # 2. Process PDF
+        if file:
+            try:
+                # Save uploaded file to a temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    file.save(temp_file.name)
+                    temp_path = temp_file.name
 
-        pdf = request.files["pdf"]
-        question = request.form.get("question", "")
+                # Load and Split PDF
+                loader = PyPDFLoader(temp_path)
+                docs = loader.load()
+                
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000,
+                    chunk_overlap=200
+                )
+                chunks = text_splitter.split_documents(docs)
 
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf.filename)
-        pdf.save(pdf_path)
+                # 3. Initialize Vector Store (With Error Handling)
+                try:
+                    vectorstore_manager = ChromaVectorStore()
+                    vectorstore = vectorstore_manager.create_store(chunks)
+                except Exception as e:
+                    print(f"Vector Store Error: {e}")
+                    return render_template("index.html", error=f"Database Error: {str(e)}")
 
-        loader = PDFDocumentLoader(pdf_path)
-        docs = loader.load()
+                # 4. Generate Answer
+                query = request.form.get("query", "Summarize this document.")
+                rag_chain = RAGChain(vectorstore)
+                answer = rag_chain.ask(query)
 
-        splitter = TextSplitter()
-        chunks = splitter.split(docs)
+            except Exception as e:
+                print(f"Processing Error: {e}")
+                error = f"An error occurred: {str(e)}"
+            
+            finally:
+                # Cleanup: Delete the temporary file
+                if 'temp_path' in locals() and os.path.exists(temp_path):
+                    os.remove(temp_path)
 
-        vectorstore = ChromaVectorStore()
-        vectorstore.create_store(chunks)
-
-        retriever = VectorRetriever(vectorstore.load_store())
-        retrieved_docs = retriever.retrieve(question)
-
-        rag = RAGChain()
-        answer = rag.generate_answer(question, retrieved_docs)
-
-    return render_template("index.html", answer=answer)
-
+    return render_template("index.html", answer=answer, error=error)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
+    app.run(host="0.0.0.0", port=10000)
