@@ -1,4 +1,4 @@
-# Move to the 0.3 ecosystem to fix the 'Gone' URL issues
+# Modern LangChain Stack (Fixes URL issues)
 langchain-core>=0.3.0
 langchain>=0.3.0
 langchain-community>=0.3.0
