@@ -31,5 +31,5 @@ Answer:
         context = "\n\n".join(d.page_content for d in docs)
         prompt = self.prompt.format(context=context, question=question)
 
-        response = self.llm.invoke(prompt)
+        response = self.llm(prompt)
         return response.content
