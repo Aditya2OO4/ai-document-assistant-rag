@@ -1,22 +1,27 @@
 from typing import List
 from langchain.schema import Document
-from langchain.prompts import PromptTemplate
-from langchain_mistralai.chat_models import ChatMistralAI
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
+import os
 
 
 class RAGChain:
     def __init__(self):
-        self.llm = ChatMistralAI(
-            model="mistral-small-latest",
-            temperature=0.2
+        self.client = MistralClient(
+            api_key=os.environ["MISTRAL_API_KEY"]
         )
 
-        self.prompt = PromptTemplate(
-            input_variables=["context", "question"],
-            template="""
-You are a helpful assistant.
-Answer the question using ONLY the context below.
+    def generate_answer(self, question: str, docs: List[Document]) -> str:
+        context = "\n\n".join(d.page_content for d in docs)
 
+        messages = [
+            ChatMessage(
+                role="system",
+                content="You are a helpful assistant. Answer ONLY using the provided context."
+            ),
+            ChatMessage(
+                role="user",
+                content=f"""
 Context:
 {context}
 
@@ -25,11 +30,13 @@ Question:
 
 Answer:
 """
+            )
+        ]
+
+        response = self.client.chat(
+            model="mistral-small-latest",
+            messages=messages,
+            temperature=0.2
         )
 
-    def generate_answer(self, question: str, docs: List[Document]) -> str:
-        context = "\n\n".join(d.page_content for d in docs)
-        prompt = self.prompt.format(context=context, question=question)
-
-        response = self.llm(prompt)
-        return response.content
+        return response.choices[0].message.content
