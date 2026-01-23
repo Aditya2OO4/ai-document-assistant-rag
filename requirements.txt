@@ -2,13 +2,14 @@ flask==3.1.2
 gunicorn==21.2.0
 
 chromadb==0.5.5
+
 langchain==0.2.11
 langchain-core==0.2.23
 langchain-community==0.2.10
 langchain-text-splitters==0.2.2
 
+langchain-mistralai==0.2.12
 mistralai==0.2.0
-langchain-mistralai==0.0.15
 
 pypdf==4.3.1
 pdfminer.six==20231228
