@@ -5,13 +5,9 @@ from langchain_community.vectorstores import Chroma
 class ChromaVectorStore:
     def __init__(self, persist_directory="db"):
         self.persist_directory = persist_directory
-        # Get API Key from Render Environment Variables
         self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         
-        if not self.api_key:
-            print("CRITICAL ERROR: HUGGINGFACEHUB_API_TOKEN not set!")
-
-        # Using the API endpoint saves 500MB+ of RAM on Render
+        # Initialize the API-based embedding model
         self.embedding_model = HuggingFaceEndpointEmbeddings(
             huggingfacehub_api_token=self.api_key,
             model="sentence-transformers/all-MiniLM-L6-v2"
@@ -26,8 +22,19 @@ class ChromaVectorStore:
             )
         return self.vector_store
 
+    # THIS IS THE MISSING METHOD CAUSING THE ERROR
+    def create_store(self, documents):
+        """Creates a new vector store from a list of documents."""
+        self.vector_store = Chroma.from_documents(
+            documents=documents,
+            embedding=self.embedding_model,
+            persist_directory=self.persist_directory
+        )
+        # In newer versions persist is automatic, but we call it for safety
+        self.vector_store.persist()
+        return self.vector_store
+
     def add_documents(self, documents):
         vector_store = self.get_vector_store()
         vector_store.add_documents(documents)
-        # Chroma 0.4+ persists automatically, but call is kept for compatibility
         vector_store.persist()
